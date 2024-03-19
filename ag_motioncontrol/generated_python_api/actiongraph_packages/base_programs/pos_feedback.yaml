@@ -1,0 +1,86 @@
+ActionGraphVersion: 1.0
+
+Components:
+  Graphs:
+    MovablePosPeriodicReporter:
+      Description: This graph sends position of given Movable at given frequency
+      Parameters:
+        frequency:
+        movable:
+        event:
+        reportNative: true
+      Script: MovablePosPeriodicReporter.lua
+      Nodes:
+        reporter:
+          Type: MOVABLE_STATUS_REPORTER
+          Parameters:
+            movable: ..movable
+            ignore_movable_errors: true
+            event: ..event
+            report_native_coord: ..reportNative
+          IgnoreUnhandledEvent: true
+        delay:
+          Type: DELAY
+          Parameters:
+            delay: = 1.0 / ..frequency
+      StateControlSlots:
+        sendOnce:
+      Connections:
+        .started: .delay.start
+        .stopped: .delay.cancel
+        .delay.started: .reporter.start
+        .delay.stopped: .delay.start
+        .sendOnce: .reporter.start
+    DeltaRobotStatePeriodicReporter:
+      Description: This graph sends tool and actuators positions of given Delta Robot at given frequency
+      Parameters:
+        frequency:
+        robot:
+        event: <DeltaRobotStatePeriodicReporterEvent>
+      Script: DeltaRobotStatePeriodicReporter.lua
+      Nodes:
+        toolReporter:
+          Type: MOVABLE_STATUS_REPORTER
+          Parameters:
+            movable: ..robot
+            ignore_movable_errors: true
+            event: ..event
+            report_native_coord: true
+          IgnoreUnhandledEvent: true
+        actuator1Reporter:
+          Type: MOVABLE_STATUS_REPORTER
+          Parameters:
+            movable: ..robot.Actuator0
+            ignore_movable_errors: true
+            event: ..event
+            report_native_coord: false
+          IgnoreUnhandledEvent: true
+        actuator2Reporter:
+          Type: MOVABLE_STATUS_REPORTER
+          Parameters:
+            movable: ..robot.Actuator1
+            ignore_movable_errors: true
+            event: ..event
+            report_native_coord: false
+          IgnoreUnhandledEvent: true
+        actuator3Reporter:
+          Type: MOVABLE_STATUS_REPORTER
+          Parameters:
+            movable: ..robot.Actuator2
+            ignore_movable_errors: true
+            event: ..event
+            report_native_coord: false
+          IgnoreUnhandledEvent: true
+        delay:
+          Type: DELAY
+          Parameters:
+            delay: = 1.0 / ..frequency
+      Connections:
+        .started: .delay.start
+        .stopped: .delay.cancel
+        .delay.started: 
+          - .toolReporter.start
+          - .actuator1Reporter.start
+          - .actuator2Reporter.start
+          - .actuator3Reporter.start
+        .delay.stopped: .delay.start

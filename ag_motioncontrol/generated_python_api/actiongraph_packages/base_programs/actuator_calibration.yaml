@@ -1,0 +1,184 @@
+ActionGraphVersion: 1.0
+
+Components:
+  Graphs:
+    GoDown:
+      Parameters:
+        actuator:
+        calibrationSpeed:
+      Sequential:
+        - Type: ANALOG_SIGNAL_VALUE_SETTER
+          Parameters:
+            signal: ..actuator.SpeedControlSignal
+            value: ..calibrationSpeed
+        - Type: DELAY
+          Parameters:
+            delay: 1.0
+        - Type: ANALOG_SIGNAL_VALUE_SETTER
+          Parameters:
+            signal: ..actuator.SpeedControlSignal
+            value: 0
+
+    ActuatorGoToHardStop:
+      Parameters:
+        actuator:
+        calibrationSpeed:
+        stopDetectionThreshold:
+      Nodes:
+        detector:
+          Type: VALUE_DIFFERENCE_WAITER
+          Parameters:
+            source1: ..actuator.PositionEstimationFeedbackSignal
+            source1_type: 1
+            source2: ..actuator.PositionFeedbackSignal
+            source2_type: 1
+            threshold: ..stopDetectionThreshold
+            time_hysteresis: 2000
+            compare_type: 1
+        starter:
+          Type: ANALOG_SIGNAL_VALUE_SETTER
+          Parameters:
+            signal: ..actuator.SpeedControlSignal
+            value: = - ..calibrationSpeed
+        stopper:
+          Type: ANALOG_SIGNAL_VALUE_SETTER
+          Parameters:
+            signal: ..actuator.SpeedControlSignal
+            value: 0
+        # detectorStartedEvent:
+        #   Type: PC_MSG_EMITTER
+        #   Parameters:
+        #     event: <DETECTOR STARTED>
+        # detectorStoppedEvent:
+        #   Type: PC_MSG_EMITTER
+        #   Parameters:
+        #     event: <DETECTOR STOPPED>
+      Connections:
+        .started:
+          - .detector.start
+          - .starter.start
+        # .detector.started: .detectorStartedEvent.start
+        .detector.stopped: .stopper.start
+        .stopper.stopped: 
+          - .stop
+          # - .detectorStoppedEvent.start
+  
+    ActuatorCalibrator_EncoderPlusMechanicalLimit:
+      Description: This graph calibrates actuator to given pos when it hits hardly the physical limit
+
+      Parameters:
+        actuator:
+        calibrationSpeed:
+        stopDetectionThreshold:
+        zeroPos:
+      Sequential:
+        - Type: HW_MODULE_CONTROLLER
+          Parameters:
+            module: ..actuator
+            state: false
+        - Type: ActuatorGoToHardStop
+          Parameters:
+            "*": ..
+        - Type: GoDown
+          Parameters:
+            "*": ..
+        - Type: ActuatorGoToHardStop
+          Parameters:
+            "*": ..
+        - Type: HW_MODULE_CONTROLLER
+          Parameters:
+            module: ..actuator
+            state: true
+        - Type: CALIBRATER
+          Parameters:
+            movable: ..actuator
+            px: ..zeroPos
+        
+
+
+    ActuatorGoToSwitch:
+      Parameters:
+        actuator:
+        calibrationSpeed:
+      Nodes:
+        detector:
+          Type: DIGITAL_SIGNAL_VALUE_WAITER
+          Parameters:
+            signal: ..actuator.EndSwitchSignal
+            value: 1
+        starter:
+          Type: ANALOG_SIGNAL_VALUE_SETTER
+          Parameters:
+            signal: ..actuator.SpeedControlSignal
+            value: = - ..calibrationSpeed
+        stopper:
+          Type: ANALOG_SIGNAL_VALUE_SETTER
+          Parameters:
+            signal: ..actuator.SpeedControlSignal
+            value: 0
+        # detectorStartedEvent:
+        #   Type: PC_MSG_EMITTER
+        #   Parameters:
+        #     event: <DETECTOR STARTED>
+        # detectorStoppedEvent:
+        #   Type: PC_MSG_EMITTER
+        #   Parameters:
+        #     event: <DETECTOR STOPPED>
+      Connections:
+        .started:
+          - .detector.start
+          - .starter.start
+        # .detector.started: .detectorStartedEvent.start
+        .detector.stopped: .stopper.start
+        .stopper.stopped: 
+          - .stop
+          # - .detectorStoppedEvent.start
+    
+    ActuatorCalibrator_EndSwitch:
+      Parameters:
+        actuator:
+        calibrationSpeed:
+        zeroPos:
+      Sequential:
+        - Type: HW_MODULE_CONTROLLER
+          Parameters:
+            module: ..actuator
+            state: false
+        - Type: HW_MODULE_CONTROLLER
+          Parameters:
+            module: ..actuator.SpeedControlSignal
+            state: false
+        - Type: HW_MODULE_CONTROLLER
+          Parameters:
+            module: ..actuator.EstimatedPositionFeedbackSignal
+            state: false
+        - Type: HW_MODULE_CONTROLLER
+          Parameters:
+            module: ..actuator.SpeedControlSignal
+            state: true
+        - Type: HW_MODULE_CONTROLLER
+          Parameters:
+            module: ..actuator.EstimatedPositionFeedbackSignal
+            state: true
+        - Type: ActuatorGoToSwitch
+          Parameters:
+            "*": ..        
+        - Type: HW_MODULE_CONTROLLER
+          Parameters:
+            module: ..actuator
+            state: true
+        - Type: CALIBRATER
+          Parameters:
+            movable: ..actuator
+            px: ..zeroPos
+
+    ActuatorImmediateCalibrater:
+      Parameters:
+        actuator:
+        zeroPos:
+      Sequential:
+        - Type: CALIBRATER
+          Parameters:
+            movable: ..actuator
+            px: ..zeroPos
+

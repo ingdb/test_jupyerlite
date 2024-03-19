@@ -1,0 +1,221 @@
+MOVEMENT:
+  Description: |
+      # This node is the basic building block for motion control, advanced smooth generic trajectories in 3d space. 
+      Basic node for 1d, 2d and 3d movements.
+      Moves a Movable from current point to given point.
+      Controllable end position, end speed and end acceleration. 
+      Allows to set limit on drift, max speed, max acceleration and max jerk.
+      Movement time could be set expicitely or, if not set, calculated
+      automatically to minimal possible value that allows to satisfy limits.
+      Movement is started immediately after "start" event slot is activated.
+      Node stops and emits "stopped" event right after movement finishes, i.e. endpoint is reached.
+
+      ## Math model of trajectory
+      Internal mathematical model for this movement is 5-th order polynomial, so position at every point is defined by
+
+              P(t) = C0 + C1 t + C2 t^2 + C3 t^3 + C4 t^4 + C5 t^5
+                  
+      where **t** is the time elapsed from movement start. To completely define the polynomial, we need to solve equations using our input data:
+
+              1) P(0) = P0
+              2) P'(0) = V0
+              3) P''(0) = A0
+              4) P(T) = P1
+              5) P'(T) = V1
+              6) P''(T) = A1
+
+      Where P0, V0, A0 describe current state of the Movable at the moment MOVEMENT starts. P1, V1, A1 are defined via parameters above.
+      So we have 6 equations and 7 variables (including T). If T is explicitely set by user, we are all ok. 
+      But if T is not set, we need to obtain it by calculations on input parameters.
+      This model allows to join curves at 0, 1 and 2 order derivatives, and make arbitrary turns.
+
+      ## Limits
+      Every robot, every Movable in Actiongraph terms, has limited performance: it cannot achieve jerks, accelerations and speeds
+      greater than certain values. It is the consequence of motor power limit, mechanical properties, etc. 
+
+      - jerk_limit
+      - accel_limit
+      - speed_limit
+
+      are used to introduce such limits. Also they can be used to ensure, that in some particular tasks maximum speed and
+      mechanical loading forces don't exceed some values.
+
+      Another kind of limit, is **drift_limit**. In all cases when V0 and V1 are not collinear to P0-P1 vector,
+      resulting trajectory will inevitably have some curvature, so it will not be the straight line from P0 to P1.
+      "Drift" is the maximum distance from trajectory to P0-P1 segment. drift_limit allows to control this drift.
+
+      When Movement is started, if T is explicitly set, resulting trajectory is checked for conforming to all these limits.
+      If T is not set, it is found automatically, to have minimum value, but still conforming to all limits.
+
+      More drift allows to create movements with lower accelerations. 
+      Higher accelerations allows to maintain low drift (make steep turns in other words).
+
+  Parameters:
+      movable:
+          Type: HW_MODULE_MOVABLE
+          Optional: false
+          Description: |
+            # Any Movable Hardware Module.
+
+      T: 
+          Type: Float
+          Optional: true
+          Description: |
+            # Movement time in seconds.
+            If not set, calculated automatically to have minimal possible value.
+          
+      is_relative:
+          Type: Bool
+          Optional: false
+          Description: |
+            When set to true, "p", "px", "py", "pz" are interpreted as relative displacement 
+            to Movable position at MOVEMENT start. If set to false, "p", "px", "py", "pz" are absolute coordinates.
+
+      p:
+          Type: Vector
+          Optional: true
+          Description: End point position, if "is_relative" is false and relative dislacement vector otherwise. Either this parameter must be set, or one or more from (px, py, pz).
+      px:
+          Type: Float
+          Optional: true
+          Description: Same as "p", but for x-component only. Condidered to be 0 if omitted.
+      py:
+          Type: Float
+          Optional: true
+          Description: Same as "p", but for y-component only. Condidered to be 0 if omitted.
+      pz:
+          Type: Float
+          Optional: true
+          Description: Same as "p", but for z-component only. Condidered to be 0 if omitted.
+
+      v: 
+          Type: Vector
+          Optional: true
+          Description: End point speed vector. Considered to be zero vector if not set, so movement will end with full stop.
+      vx:
+          Type: Float
+          Optional: true
+          Description: x component of end speed.
+      vy:
+          Type: Float
+          Optional: true
+          Description: y component of end speed.
+      vz:
+          Type: Float
+          Optional: true
+          Description: z component of end speed.
+
+      a: 
+          Type: Vector
+          Optional: true
+          Description: End point acceleration vector. Considered to be zero vector if not set, so movement will end with zero acceleration (zero load).
+      ax:
+          Type: Float
+          Optional: true
+          Description: x component of end acceleration.
+      ay:
+          Type: Float
+          Optional: true
+          Description: y component of end acceleration.
+      az:
+          Type: Float
+          Optional: true
+          Description: z component of end acceleration.
+
+      jerk_limit:
+          Type: Float
+          Optional: true
+          Description: |
+              Maximum jerk vector magnitude that could be achieved during the movement.
+              If movement cannot be performed with given input parameters, it will not be started and error will be reported
+      accel_limit:
+          Type: Float
+          Optional: false
+          Description: |
+              Maximum acceleration vector magnitude that could be achieved during the movement.
+              If movement cannot be performed with given input parameters, it will not be started and error will be reported
+      drift_limit: 
+          Type: Float
+          Optional: false
+          Description: |
+            Maximum offset from stright segment P0-P1 that could be achieved during the movement. 
+            If movement cannot be performed with given input parameters, it will not be started and error will be reported
+      speed_limit: 
+          Type: Float
+          Optional: false
+          Description: |
+              Maximum speed vector magnitude that could be achieved during the movement.
+              If movement cannot be performed with given input parameters, it will not be started and error will be reported
+      max_dynamic_error: 
+          Type: Float
+          Optional: true
+          Description: |
+            Maximum distance between required position and actual Movable position during the movement.
+            Movement will be stopped and error will be reported, if this restriction is violated.
+      max_endpoint_error:
+          Type: Float
+          Optional: true
+          Description: Maximum distance between target point and actual Movable position at the moment this movement is finished (movement time is T)
+
+  Errors:
+    ACTION_REQUIRED_PARAMETERS_NOT_SET: Happens at Movement start if if non-optional params are not set.
+    MOVABLE_NOT_FOUND: Happens at Movement start if Passed HW Module is not Movable kind.
+    MOVABLE_BUSY: Happens at Movement start if Movable is already marked as busy by some other action node or hw module.
+    HARDWARE_MODULE_NOT_RUNNING: Happens at Movement start if Movable is not running, so it cannot be moved.
+    MOVABLE_COORD_UNREACHABLE: Happens at Movement start if P1 target point lies outside of Movable's working area
+    MOVABLE_COORD_DYNAMICALLY_UNREACHABLE: |
+      Though P1 point might be reachable, it is possible, that because of large Drift, 
+      some parts of trajectory are still outside of Movable's working area. 
+      This error is generated in this case during the execution of Movement
+    MOVABLE_BAD_DYNAMIC: |
+      Happens during the execution of Movement if distance between commanded point and actual 
+      Movable position exceeds **max_dynamic_error** parameter value.
+    MOVEMENT_BAD_END_POS_PRECISION: |
+      Happens at Movement end if distance between actual Movable position and P1
+      exceeds **max_dynamic_error** parameter value
+    SMOOTH_MOVEMENT_CALCULATION_FAILED_DRIFT_LIMIT: |
+      Happens at Movement start if T value (explicitely set or automatically chosen) gives such a trajectory, 
+      that violates **drift_limit**. Acceleration limit and/or speed limits may be increased or **drift_limit** 
+      may be increased to get rid of this error. 
+      If **T** is set manually, it may be descreased to git rid of this error.
+    SMOOTH_MOVEMENT_CALCULATION_FAILED_SPEED_ACCEL_LIMIT: |
+      Happens at Movement start if T value (explicitely set or automatically chosen) gives such a trajectory,
+      that violates speed or acceleration limits. 
+      Acceleration limit and/or speed limit may be increased to get rid of this error or, 
+      if **T** is set manually, it may be increased.
+
+  VM_ABI:
+    TypeID: 22
+    ParameterOrder:
+      - movable
+      - is_relative
+      - - p
+        - px
+      - py
+      - pz
+      - - v
+        - vx
+      - vy
+      - vz
+      - - a
+        - ax
+      - ay
+      - az
+      - jerk_limit
+      - accel_limit
+      - drift_limit
+      - speed_limit
+      - max_dynamic_error
+      - max_endpoint_error
+      - T
+    ErrorCodes:
+      ACTION_REQUIRED_PARAMETERS_NOT_SET: 16
+      MOVABLE_NOT_FOUND: 5
+      MOVABLE_BUSY: 14
+      HARDWARE_MODULE_NOT_RUNNING: 37
+      MOVABLE_COORD_UNREACHABLE: 22
+      MOVABLE_COORD_DYNAMICALLY_UNREACHABLE: 42
+      MOVABLE_BAD_DYNAMIC: 23
+      MOVEMENT_BAD_END_POS_PRECISION: 39
+      SMOOTH_MOVEMENT_CALCULATION_FAILED_DRIFT_LIMIT: 44
+      SMOOTH_MOVEMENT_CALCULATION_FAILED_SPEED_ACCEL_LIMIT: 45

@@ -1,0 +1,4 @@
+max_jerk: 100
+max_acceleration: 20
+max_speed: 10
+

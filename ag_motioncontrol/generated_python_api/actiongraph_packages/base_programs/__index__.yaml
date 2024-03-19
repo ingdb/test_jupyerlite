@@ -1,0 +1,23 @@
+ActionGraphVersion: 1.0
+
+Description:
+  Common programs used in many user scenarios
+
+Export:
+  Graphs:
+    pos_feedback:
+      - MovablePosPeriodicReporter  
+      - DeltaRobotStatePeriodicReporter
+    immediate_delta_robot_calibration:
+      - DeltaRobotImmediateCalibrater
+    actuator_calibration:
+      - ActuatorCalibrator_EncoderPlusMechanicalLimit
+      - ActuatorCalibrator_EndSwitch
+      - ActuatorImmediateCalibrater
+    delta_robot_calibration:
+      - DeltaRobotHardStopCalibrater
+      - DeltaRobotEndSwitchCalibrater
+      - DeltaRobotImmediateCalibrater
+    encoder_failsafe:
+      - DeltaRobotEncoderFailsafeMonitor
+
