@@ -41,17 +41,8 @@ class MotionController:
                 'pos': 0,
                 'ts': 0
             }
-        async def notifications_reader():
-            async with self.notifications() as n:
-                async for msg in n:
-                    if msg['type'] == 'pos_feedback':
-                        self.current_positions[msg['args']['axis']] = {
-                            'pos': msg['args']['pos'],
-                            'ts': msg['args']['ts']
-                        }
-                        # print("Cur pos update: ", self.current_positions)
+
                         
-        self.pos_feedback_collection_task = asyncio.create_task(notifications_reader())
 
         self.HAL = HAL_API(self.generated_api)
 
@@ -83,7 +74,18 @@ class MotionController:
         """
         self.generated_api.start()
 
+        async def notifications_reader():
+            async with self.notifications() as n:
+                async for msg in n:
+                    if msg['type'] == 'pos_feedback':
+                        self.current_positions[msg['args']['axis']] = {
+                            'pos': msg['args']['pos'],
+                            'ts': msg['args']['ts']
+                        }
+                        # print("Cur pos update: ", self.current_positions)
         self.rpc_handler_task = asyncio.create_task(self.ticker())
+        self.pos_feedback_collection_task = asyncio.create_task(notifications_reader())
+
 
     async def stop(self):
         """

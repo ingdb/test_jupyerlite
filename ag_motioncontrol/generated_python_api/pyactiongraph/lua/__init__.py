@@ -53,9 +53,12 @@ def setup_lua_interpreter(base_interpreter_search_path=None):
         subprocess.call(f"xattr -d com.apple.quarantine {path.join(binpath, '*')}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         subprocess.call(f"chmod +x   {path.join(binpath, '*')}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     elif pl == "Windows":
-        sys.path.append(path.join(current_path, "lua_interpreter", "windows"))
-        from os import add_dll_directory
-        add_dll_directory(path.join(current_path, "lua_interpreter", "windows"))
+        import os
+        libs_dir = path.join(current_path, "lua_interpreter", "windows")
+        sys.path.append(libs_dir)
+        os.add_dll_directory(libs_dir)
+        path_before = os.environ.get("PATH")
+        os.environ["PATH"] = os.pathsep.join([path_before or "", libs_dir])
     elif pl == "Linux":
         import subprocess
         if platform.machine() == "x86_64" or platform.machine() == "AMD64":

@@ -1,5 +1,5 @@
 from ..lua import setup_lua_interpreter, add_lua_search_paths
-
+from ..jupyter_utils import is_notebook
 import asyncio
 import sys
 from os import path
@@ -38,6 +38,7 @@ class APIBase:
     ag_lua_scheduler_task_stopper = None
     simulator_port_index = 0
     simulator_port_range_start = 10000
+    ag_ws_bridge_port_range_start = 12000
     running_api_instances = set()
 
     def __init__(self, main_file_path, debug_logging=False, force_reset=False, robot_serials_override=None, manual_transport_configs=None, simulation=False, package_search_path=None, additional_client_rpc_connections=[], additional_simulator_rpc_connections={}):
@@ -95,6 +96,8 @@ class APIBase:
             return lambda: t.cancel()
         self.lua_out_rpc_funct, self.lua_in_rpc_funct = async_rpc_interface_creator(sendPythonRPCMsgWithCallback, waitPythonRPCMsgWithCallback)
 
+        self.ag_client_zmq_ws_bridge = None
+
     async def shutdown_simulators(self):
         await asyncio.gather(* self._simulator_closers)
         self._simulator_closers = []
@@ -130,12 +133,25 @@ class APIBase:
         args['input'] = self.main_file_path
         args['ACTIONGRAPH_PACKAGE_SEARCH_PATH'] = self.package_search_path
 
+        jupyter_bridge_conn = []
+        if is_notebook():
+            from ..zmq_ws_bridge import AsyncZMQWebsocketsbBridge
+            jupyter_bridge_conn.append(f'zmq in=tcp://127.0.0.1:{APIBase.ag_ws_bridge_port_range_start + 1} out=tcp://0.0.0.0:{APIBase.ag_ws_bridge_port_range_start}')
+            self.ag_client_zmq_ws_bridge = AsyncZMQWebsocketsbBridge(
+                pub_zmq_address=f"tcp://127.0.0.1:{APIBase.ag_ws_bridge_port_range_start + 1}",
+                sub_zmq_address=f"tcp://127.0.0.1:{APIBase.ag_ws_bridge_port_range_start}",
+                http_port=8081,
+                debug=False,
+                static_content_dirs=[path.join(path.dirname(path.abspath(__file__)), "..", "jupyter_utils/html_frontends/")]
+
+            )
+            asyncio.create_task(self.ag_client_zmq_ws_bridge.start())
         global stderrPrintFunction # FIXME
         stderrPrintFunction = stderr_printer
         args['ag_rpc_transport_config'] = [{
             "rpcSendFunction": self.lua_out_rpc_funct,
             "rpcReceiveFunction": self.lua_in_rpc_funct
-        }, *self.additional_client_rpc_connections]
+        }, *self.additional_client_rpc_connections, *jupyter_bridge_conn]
 
         self.lua_actiongraph_client = lua_cli_module.CreateActionGraphClient(_toLua(args))
 
@@ -197,6 +213,8 @@ class APIBase:
             await call_lua_async(self.lua_actiongraph_client.Shutdown)
             self.lua_actiongraph_client = None
         APIBase.running_api_instances.remove(self)
+        if self.ag_client_zmq_ws_bridge:
+            await self.ag_client_zmq_ws_bridge.stop()
         if len(APIBase.running_api_instances) == 0:
             if APIBase.ag_lua_scheduler_task_stopper:
                 await APIBase.ag_lua_scheduler_task_stopper()
