@@ -1,0 +1,20 @@
+Version: "1.0"
+Robots:
+  "robot_01":
+    Scripts:
+    - main.lua
+    Parameters:
+      permanentStorage: true
+      motorCount: 3
+      showMotorPosGraphs: false
+      showMotorSpeedGraphs: true
+      showMotorStallStates: false
+  # "robot_02":
+  #   Scripts:
+  #   - main.lua
+  #   Parameters:
+  #     permanentStorage: true
+  #     motorCount: 3
+  #     showMotorPosGraphs: true
+  #     showMotorSpeedGraphs: true
+  #     showMotorStallStates: false

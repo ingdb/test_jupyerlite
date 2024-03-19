@@ -1,0 +1,27 @@
+ActionGraphVersion: 1.0
+Components:
+  Graphs:
+    EmergencyStopper:
+      StateTransitionEvents:
+        activated:
+      Connections:
+        .started: .waiter.start
+        .waiter.stopped:
+        - .delay.start
+        - .activated
+        - .reporter.start
+        .delay.stopped: .waiter.start
+      Nodes:
+        waiter:
+          Type: DIGITAL_SIGNAL_VALUE_WAITER
+          Parameters:
+            signal: Hardware.EmergencyStopSignal
+            value: true
+        reporter:
+          Type: PC_MSG_EMITTER
+          Parameters:
+            event: <EMERGENCY_BREAK_TRIGGERED>
+        delay:
+          Type: DELAY
+          Parameters:
+            delay: 1

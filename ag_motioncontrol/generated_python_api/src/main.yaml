@@ -1,0 +1,92 @@
+ActionGraphVersion: 1.0
+
+Import:
+  Hardware:
+    .motor_hw:
+    - Motor
+    .user_defined:
+    - CustomHWModules
+    .gpio_control:
+    - GPIO_CONTROL
+  Graphs:
+    .axis:
+    - Axis
+    .emergency_stopper:
+    - EmergencyStopper
+    .gpio_control:
+    - GPIO_CONTROL
+    .user_defined:
+    - CustomProgram
+
+Components:
+  Hardware:
+    MotionControllerRobot: # top level structure, the entire music robot consists of 3 motors, so we are creating them here
+      Modules:
+        Motor0:
+          Type: Motor
+          Parameters:
+            generator_hal_signal_id: 0
+            estimated_feedback_hal_signal_id: 0
+            stalled_hal_signal_id: 0
+        Motor1:
+          Type: Motor
+          Parameters:
+            generator_hal_signal_id: 1
+            estimated_feedback_hal_signal_id: 1
+            stalled_hal_signal_id: 1
+        Motor2:
+          Type: Motor
+          Parameters:
+            generator_hal_signal_id: 2
+            estimated_feedback_hal_signal_id: 2
+            stalled_hal_signal_id: 2     
+        EmergencyStopSignal:
+          Type: DIGITAL_INPUT_SIGNAL
+          Autostart: true
+          Parameters:
+            hal_id: 66
+        GPIOControlModule: GPIO_CONTROL
+        CustomHWModules:
+          Type: CustomHWModules
+          Autostart: true
+  Graphs:
+    Main:
+      Script: main.lua
+      Nodes:
+        a0:
+          Type: Axis
+          Parameters:
+            movable: Hardware.Motor0
+            axisIndex: 0
+        a1:
+          Type: Axis
+          Parameters:
+            movable: Hardware.Motor1
+            axisIndex: 1
+        a2:
+          Type: Axis
+          Parameters:
+            movable: Hardware.Motor2
+            axisIndex: 2    
+        
+        emergencyStopper: EmergencyStopper
+        gpioControl: GPIO_CONTROL
+        customProgram: CustomProgram
+          
+      Connections:
+        .started:
+        - .a0.start
+        - .a1.start
+        - .a2.start        
+        - .emergencyStopper.start
+        - .gpioControl.start
+        - .customProgram.start
+        .emergencyStopper.activated:
+        - .a0.emergencyBreak
+        - .a1.emergencyBreak
+        - .a2.emergencyBreak
+Robots:
+  'robot':
+    Serial: "robot_01"
+    Hardware: MotionControllerRobot
+    Graph: Main

@@ -1,0 +1,48 @@
+ActionGraphVersion: 1.0
+Import:
+  Graphs:
+    base_programs:
+      - MovablePosPeriodicReporter
+Components:
+  Graphs:
+    PosFeedbackSender:
+      Parameters:
+        movable:
+        frequency:
+          Type: Float
+          Mutable: true
+          Value: 2
+        threshold:
+          Type: Float
+          Mutable: true
+          Value: 0.001
+        reportNative: true
+        event: <AxisPosEvent>
+      Nodes:
+        starter:
+          Type: PC_MSG_WAITER
+        stopper:
+          Type: PC_MSG_WAITER
+        reporter:
+          Type: MovablePosPeriodicReporter
+          Parameters:
+            movable: ..movable
+            frequency: ..frequency
+            event: ..event
+            reportNative: ..reportNative
+      StateControlSlots:
+        sendOnce:
+      Connections:
+        .sendOnce: .reporter.sendOnce
+        .started: 
+        - .stopper.start
+        - .starter.start
+        .stopper.stopped:
+          - .stopper.start
+          - .reporter.stop
+        .starter.stopped:
+          - .starter.start
+          - .reporter.start
+
+
+

@@ -1,0 +1,131 @@
+ActionGraphVersion: 1.0
+
+Components:
+  Graphs:
+    ParamAssigner:
+      Sequential:
+      - Type: PARAM_ASSIGNER
+        Parameters:
+          param_from: ......px
+          param_to: ....px
+      - Type: PARAM_ASSIGNER
+        Parameters:
+          param_from: ......vx
+          param_to: ....vx
+      - Type: PARAM_ASSIGNER
+        Parameters:
+          param_from: ......jerk_limit
+          param_to: ....jerk_limit
+      - Type: PARAM_ASSIGNER
+        Parameters:
+          param_from: ......accel_limit
+          param_to: ....accel_limit
+      - Type: PARAM_ASSIGNER
+        Parameters:
+          param_from: ......speed_limit
+          param_to: ....speed_limit
+      - Type: PARAM_ASSIGNER
+        Parameters:
+          param_from: ......T
+          param_to: ....T
+      - Type: PARAM_ASSIGNER
+        Parameters:
+          param_from: ......uniqueMovementId
+          param_to: ....uniqueMovementId
+          
+    WrappedMV:
+      Parameters:
+        movable: 
+        is_relative: false
+        px:
+          Type: Float
+          Mutable: true
+          Value: 0
+        py: 0
+        pz: 0
+        vx:
+          Type: Float
+          Mutable: true
+          Value: 0
+        vy: 0
+        vz: 0
+        ax: 0
+        ay: 0
+        az: 0
+        jerk_limit:
+          Type: Float
+          Mutable: true
+          Value: 1e9
+        accel_limit:
+          Type: Float
+          Mutable: true
+          Value: 10
+        drift_limit:  0.00001
+        speed_limit:
+          Type: Float
+          Mutable: true
+          Value: 10
+        T:
+          Type: Float
+          Mutable: true
+          Value: 0
+        uniqueMovementId:
+          Type: Float
+          Mutable: true
+          Value: 0
+        max_dynamic_error: 1e9
+        max_endpoint_error: 1e9
+
+        pos_at_start:
+          Type: Float
+          Mutable: true
+          Value: 0
+
+      Nodes:
+        mv:
+          Type: MOVEMENT
+          Parameters:
+            "*": ..
+        mvErredDelay:
+          Type: DELAY
+          Parameters:
+            delay: 0.001
+        startPosSaver:
+          Type: MOVABLE_STATUS_SAVER
+          Parameters:
+            movable: ..movable
+            px: ..pos_at_start
+        semifinishDetector:
+          Type: POSITION_DETECTOR
+          Parameters:
+            movable: ..movable
+            px: ..pos_at_start
+            threshold: = mag(..pos_at_start - ..px) * 0.75
+            op_type: 1
+        latcher: ParamAssigner
+        stopDelay:
+          Type: DELAY
+          Parameters:
+            delay: 0.001
+      StateTransitionEvents:
+        mvErred:
+        semifinished:
+      Connections:
+        .started: .startPosSaver.start
+        .startPosSaver.stopped: .latcher.start
+        .latcher.stopped: 
+          - .mv.start
+          - .semifinishDetector.start
+        .semifinishDetector.stopped: .semifinished
+        .stopped: 
+          - .mv.cancel
+          - .semifinishDetector.cancel
+        .mv.stopped: .stopDelay.start
+        .stopDelay.stopped: 
+          - .stop
+          - .semifinishDetector.cancel
+        .mv.erred: 
+          - .mvErredDelay.start
+        .mvErredDelay.stopped:
+          - .mvErred
+          - .semifinishDetector.cancel

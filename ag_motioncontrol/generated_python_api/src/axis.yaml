@@ -1,0 +1,215 @@
+ActionGraphVersion: 1.0
+
+Import:
+  Graphs:
+    base_programs:
+      - ActuatorCalibrator_EndSwitch
+    .pos_feedback:
+      - PosFeedbackSender
+    .wrapped_movement:
+      - WrappedMV
+
+Components:
+  Graphs:
+    Calibrater:
+      Parameters:
+        motor:
+        calibrationSpeed:
+        axisIndex:
+        actuatorZeroPos:
+          Type: Float
+          Mutable: true
+          Value: 0
+        zeroPos: .actuatorZeroPos
+      Sequential:
+      - Type: HAL_REQUEST
+        Parameters:
+          requestType: 101
+          message: '= formatNumber ( "ui1", ..axisIndex)'
+      - Type: ActuatorCalibrator_EndSwitch
+        Parameters:
+          actuator: ..motor
+          "*": ..
+      - Type: DELAY
+        Parameters:
+          delay: 0.1
+    FinishedReporter:
+      Parameters:
+        savedX:
+          Type: Float
+          Mutable: true
+          Value: 0
+      Nodes:
+        crtSaver:
+          Type: MOVABLE_STATUS_SAVER
+          Parameters:
+            movable: ....movable
+            px: ..savedX
+        crtSender:
+          Type: PARAMETER_VALUES_SENDER
+          Parameters:
+            param1: ....wrappedMovement.uniqueMovementId
+            param2: ..savedX
+      Connections:
+        .started: .crtSaver.start
+        .crtSaver.stopped:
+        - .crtSender.start
+        - .stop
+
+    Axis:
+      Parameters:
+        movable:
+        px:
+          Type: Float
+          Mutable: true
+          Value: 0
+        vx:
+          Type: Float
+          Mutable: true
+          Value: 0
+        jerk_limit:
+          Type: Float
+          Mutable: true
+          Value: 1e9
+        accel_limit:
+          Type: Float
+          Mutable: true
+          Value: 10
+        speed_limit:
+          Type: Float
+          Mutable: true
+          Value: 10
+        T:
+          Type: Float
+          Mutable: true
+          Value: 0
+
+        halMessage:
+          Type: ByteString
+          Mutable: true
+          Value: ""
+        axisIndex:
+
+        uniqueMovementId:
+          Type: Float
+          Mutable: true
+          Value: 0
+        homingSpeed:
+          Type: Float
+          Mutable: true
+          Value: 6.28
+      StateControlSlots:
+        emergencyBreak:
+      Nodes:
+        calibrater:
+          Type: Calibrater
+          Parameters:
+            axisIndex: ..axisIndex
+            motor: ..movable
+            calibrationSpeed: ..homingSpeed
+        wrappedMovement: 
+          Type: WrappedMV
+          Parameters:
+            movable: ..movable
+        positionReporter:
+          Type: PosFeedbackSender
+          Parameters:
+            movable: ..movable
+            reportNative: false
+        startEventWaiter:
+          Type: PC_MSG_WAITER
+        homingEventWaiter:
+          Type: PC_MSG_WAITER
+        breakEventWaiterStarter:
+          Type: DELAY
+          Parameters:
+            delay: 0.001
+        breakEventWaiter:
+          Type: PC_MSG_WAITER
+        armedLatch: SYNCER
+        breakedLatch: SYNCER
+        semifinishedReporter:
+          Type: PARAMETER_VALUES_SENDER
+          Parameters:
+            param1: ..wrappedMovement.uniqueMovementId
+        allFinishedReporter:
+          Type: MOVABLE_STATUS_REPORTER
+          Parameters:
+            movable: ..movable
+            ignore_movable_errors: true
+            report_native_coord: false
+        currentFinishedReporter: FinishedReporter
+
+        mvErrorReporter:
+          Type: PARAMETER_VALUES_SENDER
+          Parameters:
+            param1: ..wrappedMovement.uniqueMovementId
+        homingDoneReporter:
+          Type: PC_MSG_EMITTER
+        
+      Connections:
+        .started: 
+          - .startEventWaiter.start
+          - .homingEventWaiter.start
+          - .breakEventWaiter.start
+          - .positionReporter.start
+          - .breakedLatch.stop
+        .homingEventWaiter.stopped:
+          - .breakedLatch.start
+          - .armedLatch.stop
+          - .startEventWaiter.cancel
+        ?
+          All:
+            - .homingEventWaiter.stopped
+            - .breakedLatch.started
+        :    
+          - .wrappedMovement.stop
+        ?
+          All:
+            - .homingEventWaiter.stopped
+            - .breakedLatch.started
+            - .wrappedMovement.stopped
+        :    
+          - .calibrater.start
+        .emergencyBreak: .breakEventWaiter.stop
+        .breakEventWaiter.stopped:
+          - .breakedLatch.start
+          - .armedLatch.stop    
+        .breakEventWaiterStarter.stopped: .breakEventWaiter.start
+        ?
+          All:
+            - .breakEventWaiter.stopped
+            - .breakedLatch.started
+        :    
+          - .wrappedMovement.stop
+          - .startEventWaiter.start
+          - .breakEventWaiterStarter.start
+        .calibrater.stopped:
+          - .homingEventWaiter.start
+          - .homingDoneReporter.start
+          - .startEventWaiter.start
+        .startEventWaiter.stopped:
+          - .breakedLatch.stop
+          - .armedLatch.start
+          - .wrappedMovement.start
+        .wrappedMovement.semifinished: 
+          - .armedLatch.stop
+          - .semifinishedReporter.start
+          - .startEventWaiter.start
+        .wrappedMovement.mvErred: 
+          - .armedLatch.stop
+          - .mvErrorReporter.start
+          - .breakedLatch.start
+        ?
+          All:
+            - .armedLatch.started
+            - .wrappedMovement.stopped
+            - .breakedLatch.stopped
+        :
+          - .wrappedMovement.start
+        ?
+          All:
+            - .armedLatch.stopped
+            - .wrappedMovement.stopped
+        : .allFinishedReporter.start
+        .wrappedMovement.stopped: .currentFinishedReporter.start

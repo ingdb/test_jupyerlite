@@ -1,0 +1,76 @@
+ActionGraphVersion: 1.0
+
+Components:
+  Hardware:
+    GPIO_CONTROL:
+      Parameters:
+        hal_id:
+          Type: Integer
+          Value: 0
+          Mutable: true
+
+      Modules:
+        DIGITAL_IN:
+          Type: DIGITAL_INPUT_SIGNAL
+          Autostart: false
+          Parameters:
+            hal_id: ..hal_id
+        DIGITAL_OUT: 
+          Type: DIGITAL_OUTPUT_SIGNAL
+          Autostart: false
+          Parameters:
+            hal_id: ..hal_id
+            initialValue: false
+
+  Graphs:
+    WRAPPED_DIGITAL_SIGNAL_REPORTER:
+      Nodes:
+        rpt:
+          Type: DIGITAL_SIGNAL_VALUE_REPORTER
+          Parameters:
+            signal: Hardware.GPIOControlModule.DIGITAL_IN
+            event: <GPIO_DIN_VALUE>
+      Connections:
+        .started:
+        - .rpt.start
+        - .stop
+    GPIO_CONTROL:
+      Parameters:
+        gpioValueToWrite:
+          Type: Integer
+          Value: 0
+          Mutable: true
+      Parallel:
+      - Sequential:
+        - Type: PC_MSG_WAITER
+          Parameters:
+            event: <READ_GPIO>
+        - Type: HW_MODULE_CONTROLLER
+          Parameters:
+            module: Hardware.GPIOControlModule.DIGITAL_IN
+            state: true
+        - WRAPPED_DIGITAL_SIGNAL_REPORTER
+        - Type: HW_MODULE_CONTROLLER
+          Parameters:
+            module: Hardware.GPIOControlModule.DIGITAL_IN
+            state: false
+        Connections:
+          .stopped: .start
+      - Sequential:
+        - Type: PC_MSG_WAITER
+          Parameters:
+            event: <WRITE_GPIO>
+        - Type: HW_MODULE_CONTROLLER
+          Parameters:
+            module: Hardware.GPIOControlModule.DIGITAL_OUT
+            state: true
+        - Type: DIGITAL_SIGNAL_VALUE_SETTER
+          Parameters:
+            signal: Hardware.GPIOControlModule.DIGITAL_OUT
+            value: ....gpioValueToWrite
+        - Type: HW_MODULE_CONTROLLER
+          Parameters:
+            module: Hardware.GPIOControlModule.DIGITAL_OUT
+            state: false
+        Connections:
+          .stopped: .start

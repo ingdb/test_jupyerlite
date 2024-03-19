@@ -1,0 +1,15 @@
+ActionGraphVersion: 1.0
+
+Components:
+  Graphs:
+    CustomProgram:
+      Type: SYNCER
+  Hardware:
+    CustomHWModules:
+      Modules:
+        TestOutputExampleSignal:
+          Type: DIGITAL_OUTPUT_SIGNAL
+          Autostart: false
+          Parameters:
+            initialValue: false
+            hal_id: 88

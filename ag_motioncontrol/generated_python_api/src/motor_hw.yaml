@@ -1,0 +1,56 @@
+ActionGraphVersion: 1.0
+
+Components:
+  Hardware:
+    Motor:
+      Parameters:
+        generator_hal_signal_id:
+        position_feedback_hal_signal_id:
+        estimated_feedback_hal_signal_id:
+        stalled_hal_signal_id:
+        PID_P: 200
+        PID_I: 5
+        microsteps: 16
+        LinearActuatorDisplacement_MotorRotation_ratio: 0.01177746578
+
+        resolution: = 3.14159 * 2.0 / 200.0 / .microsteps * .LinearActuatorDisplacement_MotorRotation_ratio
+        control_scale: = 1.0 / .resolution / .user_defined_scale
+        #estimated_feedback_scale: = 3.14159 * 2.0 / 2000.0     
+        estimated_feedback_scale: = .resolution * .user_defined_scale
+        user_defined_scale:
+          Type: Float
+          Mutable: true
+          Value: 1
+      Modules:
+        SpeedControlSignal:
+          Type: ANALOG_OUTPUT_SIGNAL
+          Autostart: true
+          Parameters:
+            hal_id: ..generator_hal_signal_id
+            scale: ..control_scale
+            offset: 0
+            initialValue: 0
+        EstimatedPositionFeedbackSignal:
+          Type: ANALOG_INPUT_SIGNAL
+          Autostart: true
+          Parameters:
+            hal_id: ..estimated_feedback_hal_signal_id
+            scale: ..estimated_feedback_scale
+            offset: 0
+        PIDController:
+          Type: BASIC_PID_CONTROLLER
+          Autostart: true
+          Parameters:
+            control_signal: ..SpeedControlSignal
+            feedback_signal: ..EstimatedPositionFeedbackSignal
+            P: ..PID_P
+            I: ..PID_I
+            D: 0
+            resolution: ..resolution
+        EndSwitchSignal:
+          Type: DIGITAL_INPUT_SIGNAL
+          Autostart: true
+          Parameters:
+            hal_id: ..stalled_hal_signal_id
+      Main: PIDController
+
